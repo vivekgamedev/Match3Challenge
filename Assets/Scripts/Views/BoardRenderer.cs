@@ -14,26 +14,38 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 			this.board = board;
 
 			CenterCamera();
-			CreateVisualPiecesFromBoardState();
+			CreateVisualPiecesFromBoardState(null);
 		}
 
 		private void CenterCamera() {
 			Camera.main.transform.position = new Vector3((board.Width-1)*0.5f,-(board.Height-1)*0.5f);
 		}
 
-		private void CreateVisualPiecesFromBoardState() {
+		private void CreateVisualPiecesFromBoardState(ResolveResult result) {
 			DestroyVisualPieces();
 
-			foreach (var pieceInfo in board.IteratePieces()) {
-				
+			foreach (var pieceInfo in board.IteratePieces())
+			{
 				var visualPiece = CreateVisualPiece(pieceInfo.piece);
-				visualPiece.transform.localPosition = LogicPosToVisualPos(pieceInfo.pos.x, pieceInfo.pos.y);
 
+				if (result != null && result.changes.ContainsKey(pieceInfo.piece))
+				{
+					visualPiece.SetTargetPosition(LogicPosToVisualPos(result.changes[pieceInfo.piece].FromPos), LogicPosToVisualPos(result.changes[pieceInfo.piece].ToPos));
+				}
+				else
+				{
+					visualPiece.transform.localPosition = LogicPosToVisualPos(pieceInfo.pos.x, pieceInfo.pos.y);
+				}
 			}
 		}
-		
+
 		public Vector3 LogicPosToVisualPos(float x,float y) { 
 			return new Vector3(x, -y, -y);
+		}
+
+		public Vector3 LogicPosToVisualPos(BoardPos pos)
+		{
+			return new Vector3(pos.x, -pos.y, -pos.y);
 		}
 
 		private BoardPos ScreenPosToLogicPos(float x, float y) { 
@@ -70,10 +82,9 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 				var pos = ScreenPosToLogicPos(Input.mousePosition.x, Input.mousePosition.y);
 
 				if (board.IsWithinBounds(pos.x, pos.y)) {
-					board.Resolve(pos.x, pos.y);
-					CreateVisualPiecesFromBoardState();
+					var result = board.Resolve(pos.x, pos.y);
+					CreateVisualPiecesFromBoardState(result);
 				}
-
 			}
 		}
 		
