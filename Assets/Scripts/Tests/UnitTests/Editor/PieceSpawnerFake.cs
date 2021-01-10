@@ -13,5 +13,10 @@ namespace Tactile.TactileMatch3Challenge.Tests.UnitTests
         public int CreateBasicPiece() {
             return value;
         }
+
+        public int CreatePowerPiece()
+        {
+            return value;
+        }
     }
 }

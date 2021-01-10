@@ -62,9 +62,28 @@ namespace Tactile.TactileMatch3Challenge.Model {
             return ArrayUtility.TransposeArray(result);
         }
 
-        public ResolveResult Resolve(int x, int y) {
-	        FindAndRemoveConnectedAt(x, y);
+        public ResolveResult Resolve(int x, int y)
+        {
+	        var basePiece = GetAt(x, y);
+	        var isPowerPiece = basePiece.isHorizontalPowerPiece || basePiece.isVerticalPowerPiece;
+	        var connectedCount = FindAndRemoveConnectedAt(x, y);
+	        
+	        if (!isPowerPiece && connectedCount >= 5)
+	        {
+		        InsertPowerPiece(x, y);
+	        }
+	        
 	        return MoveAndCreatePiecesUntilFull();
+        }
+        
+        private void InsertPowerPiece(int x, int y)
+        {
+	        if (GetAt(x, y) != null)
+	        {
+		        return;
+	        }
+	        
+	        CreatePiece(pieceSpawner.CreatePowerPiece(), x,y);
         }
 
         public Piece GetAt(int x, int y) {
@@ -117,7 +136,19 @@ namespace Tactile.TactileMatch3Challenge.Model {
         
         public List<Piece> GetConnected(int x, int y) {
             var start = GetAt(x, y);
-            return SearchForConnected(start, new List<Piece>());
+            var connectedPieces = new List<Piece>();
+
+            if (start.isVerticalPowerPiece)
+            {
+	            return GetAllVertical(x, connectedPieces);
+            }
+
+            if (start.isHorizontalPowerPiece)
+            {
+	            return GetAllHorizontal(y, connectedPieces);
+            }
+
+            return SearchForConnected(start, connectedPieces);
         }
 
         private List<Piece> SearchForConnected(Piece piece, List<Piece> searched) {
@@ -143,6 +174,48 @@ namespace Tactile.TactileMatch3Challenge.Model {
 
             return searched;
         }
+
+        private List<Piece> GetAllVertical(int x, List<Piece> pieces)
+        {
+	        for (int i = 0; i < Height; i++)
+	        {
+		        var piece = GetAt(x, i);
+		        if (pieces.Contains(piece))
+		        {
+			        continue;
+		        }
+		        
+		        pieces.Add(piece);
+
+		        if (piece.isHorizontalPowerPiece)
+		        {
+			        GetAllHorizontal(i, pieces);
+		        }
+	        }
+
+	        return pieces;
+        }
+        
+        private List<Piece> GetAllHorizontal(int y, List<Piece> pieces)
+        {
+	        for (int i = 0; i < Width; i++)
+	        {
+		        var piece = GetAt(i, y);
+		        if (pieces.Contains(piece))
+		        {
+			        continue;
+		        }
+		        
+		        pieces.Add(piece);
+
+		        if (piece.isVerticalPowerPiece)
+		        {
+			        GetAllVertical(i, pieces);
+		        }
+	        }
+
+	        return pieces;
+        }
         
         public Piece[] GetNeighbors(int x, int y) {
 
@@ -163,12 +236,14 @@ namespace Tactile.TactileMatch3Challenge.Model {
             return neighbors;
         }
         
-        public void FindAndRemoveConnectedAt(int x, int y) {
-
+        public int FindAndRemoveConnectedAt(int x, int y)
+        {
 			var connections = GetConnected(x, y);
 			if (connections.Count > 1) {
 				RemovePieces(connections);
 			}
+
+			return connections.Count;
 		}
 
 		public ResolveResult MoveAndCreatePiecesUntilFull() {
