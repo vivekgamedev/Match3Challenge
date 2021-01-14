@@ -1,4 +1,6 @@
-﻿using Tactile.TactileMatch3Challenge.Model;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Tactile.TactileMatch3Challenge.Model;
 using UnityEngine;
 
 namespace Tactile.TactileMatch3Challenge.ViewComponents {
@@ -7,6 +9,8 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 		
 		[SerializeField] private PieceTypeDatabase pieceTypeDatabase;
 		[SerializeField] private VisualPiece visualPiecePrefab;
+
+		private readonly Dictionary<Piece, VisualPiece> pieceMapper = new Dictionary<Piece, VisualPiece>();
 		
 		private Board board;
 		
@@ -14,28 +18,40 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 			this.board = board;
 
 			CenterCamera();
-			CreateVisualPiecesFromBoardState(null);
+			CreateVisualPiecesFromBoardState();
 		}
 
 		private void CenterCamera() {
 			Camera.main.transform.position = new Vector3((board.Width-1)*0.5f,-(board.Height-1)*0.5f);
 		}
 
-		private void CreateVisualPiecesFromBoardState(ResolveResult result) {
+		private void CreateVisualPiecesFromBoardState() {
 			DestroyVisualPieces();
-
+			
 			foreach (var pieceInfo in board.IteratePieces())
 			{
 				var visualPiece = CreateVisualPiece(pieceInfo.piece);
+				visualPiece.transform.localPosition = LogicPosToVisualPos(pieceInfo.pos.x, pieceInfo.pos.y);
+			}
+		}
 
-				if (result != null && result.changes.ContainsKey(pieceInfo.piece))
-				{
-					visualPiece.SetTargetPosition(LogicPosToVisualPos(result.changes[pieceInfo.piece].FromPos), LogicPosToVisualPos(result.changes[pieceInfo.piece].ToPos));
-				}
-				else
-				{
-					visualPiece.transform.localPosition = LogicPosToVisualPos(pieceInfo.pos.x, pieceInfo.pos.y);
-				}
+		private void CreateVisualPiecesFromResolveResult(ResolveResult result)
+		{
+			if (result == null)
+			{
+				return;
+			}
+			
+			foreach (var piece in result.connected.Where(piece => pieceMapper.ContainsKey(piece)))
+			{
+				Destroy(pieceMapper[piece].gameObject);
+				pieceMapper.Remove(piece);
+			}
+			
+			foreach (var change in result.changes)
+			{
+				var visualPiece = change.Value.WasCreated ? CreateVisualPiece(change.Key) : pieceMapper[change.Key];
+				visualPiece.SetTargetPosition(LogicPosToVisualPos(result.changes[change.Key].FromPos), LogicPosToVisualPos(result.changes[change.Key].ToPos));
 			}
 		}
 
@@ -63,6 +79,7 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 		private VisualPiece CreateVisualPiece(Piece piece) {
 			
 			var pieceObject = Instantiate(visualPiecePrefab, transform, true);
+			pieceMapper[piece] = pieceObject;
 			var sprite = pieceTypeDatabase.GetSpriteForPieceType(piece.type);
 			pieceObject.SetSprite(sprite);
 			return pieceObject;
@@ -73,21 +90,27 @@ namespace Tactile.TactileMatch3Challenge.ViewComponents {
 			foreach (var visualPiece in GetComponentsInChildren<VisualPiece>()) {
 				Object.Destroy(visualPiece.gameObject);
 			}
+			pieceMapper.Clear();
 		}
 
-		private void Update() {
-			
-			if (Input.GetMouseButtonDown(0)) {
+		public void ResetBoard()
+		{
+			board.RemoveAllPieces();
+			DestroyVisualPieces();
+		}
 
-				var pos = ScreenPosToLogicPos(Input.mousePosition.x, Input.mousePosition.y);
+		public ResolveResult OnClicked(float x, float y)
+		{
+			var pos = ScreenPosToLogicPos(x, y);
 
-				if (board.IsWithinBounds(pos.x, pos.y)) {
-					var result = board.Resolve(pos.x, pos.y);
-					CreateVisualPiecesFromBoardState(result);
-				}
+			if (board.IsWithinBounds(pos.x, pos.y))
+			{
+				var result = board.Resolve(pos.x, pos.y);
+				CreateVisualPiecesFromResolveResult(result);
+				return result;
 			}
-		}
-		
-	}
 
+			return null;
+		}
+	}
 }

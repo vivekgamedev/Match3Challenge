@@ -64,26 +64,39 @@ namespace Tactile.TactileMatch3Challenge.Model {
 
         public ResolveResult Resolve(int x, int y)
         {
-	        var basePiece = GetAt(x, y);
-	        var isPowerPiece = basePiece.isHorizontalPowerPiece || basePiece.isVerticalPowerPiece;
-	        var connectedCount = FindAndRemoveConnectedAt(x, y);
-	        
-	        if (!isPowerPiece && connectedCount >= 5)
+	        var resolveResult = new ResolveResult
 	        {
-		        InsertPowerPiece(x, y);
-	        }
+		        connected = FindAndRemoveConnectedAt(x, y)
+	        };
 	        
-	        return MoveAndCreatePiecesUntilFull();
+	        InsertPowerPieceIfConditionMet(x, y,resolveResult);
+	        MoveAndCreatePiecesUntilFull(resolveResult);
+	        return resolveResult;
         }
         
-        private void InsertPowerPiece(int x, int y)
+        private void InsertPowerPieceIfConditionMet(int x, int y, ResolveResult resolveResult)
         {
-	        if (GetAt(x, y) != null)
+	        if (resolveResult == null ||
+	            resolveResult.connected.Count < 5)
 	        {
 		        return;
 	        }
-	        
-	        CreatePiece(pieceSpawner.CreatePowerPiece(), x,y);
+
+	        var basePiece = resolveResult.connected[0];
+
+	        if (basePiece.isHorizontalPowerPiece ||
+	            basePiece.isVerticalPowerPiece)
+	        {
+		        return;
+	        }
+
+	        var piece = CreatePiece(pieceSpawner.CreatePowerPiece(), x, y);
+	        resolveResult.changes[piece] = new ChangeInfo{
+		        CreationTime = 0,
+		        WasCreated = true,
+		        ToPos = new BoardPos(x,y),
+		        FromPos = new BoardPos(x,y)
+	        };
         }
 
         public Piece GetAt(int x, int y) {
@@ -117,6 +130,11 @@ namespace Tactile.TactileMatch3Challenge.Model {
         public void RemovePieceAt(int x, int y) {
             boardState[x, y] = null;
         }
+
+        public void RemoveAllPieces()
+        {
+	        boardState = null;
+        }
         
         public bool TryGetPiecePos(Piece piece, out int px, out int py) {
                for (int y = 0; y < Height; y++) {
@@ -136,19 +154,18 @@ namespace Tactile.TactileMatch3Challenge.Model {
         
         public List<Piece> GetConnected(int x, int y) {
             var start = GetAt(x, y);
-            var connectedPieces = new List<Piece>();
 
             if (start.isVerticalPowerPiece)
             {
-	            return GetAllVertical(x, connectedPieces);
+	            return SearchForVertical(start, new List<Piece>());
             }
 
             if (start.isHorizontalPowerPiece)
             {
-	            return GetAllHorizontal(y, connectedPieces);
+	            return SearchForHorizontal(start, new List<Piece>());
             }
 
-            return SearchForConnected(start, connectedPieces);
+            return SearchForConnected(start, new List<Piece>());
         }
 
         private List<Piece> SearchForConnected(Piece piece, List<Piece> searched) {
@@ -175,46 +192,62 @@ namespace Tactile.TactileMatch3Challenge.Model {
             return searched;
         }
 
-        private List<Piece> GetAllVertical(int x, List<Piece> pieces)
+        private List<Piece> SearchForVertical(Piece piece, List<Piece> searched)
         {
+	        if (!TryGetPiecePos(piece, out var x, out var y)) {
+		        return searched;
+	        }
+	        
+	        searched.Add(piece);
+	        
 	        for (int i = 0; i < Height; i++)
 	        {
-		        var piece = GetAt(x, i);
-		        if (pieces.Contains(piece))
+		        var verticalPiece = GetAt(x, i);
+		        if (searched.Contains(verticalPiece))
 		        {
 			        continue;
 		        }
-		        
-		        pieces.Add(piece);
 
-		        if (piece.isHorizontalPowerPiece)
+		        if (verticalPiece.isHorizontalPowerPiece)
 		        {
-			        GetAllHorizontal(i, pieces);
+			        SearchForHorizontal(verticalPiece, searched);
+		        }
+		        else
+		        {
+			        searched.Add(verticalPiece);
 		        }
 	        }
 
-	        return pieces;
+	        return searched;
         }
         
-        private List<Piece> GetAllHorizontal(int y, List<Piece> pieces)
+        private List<Piece> SearchForHorizontal(Piece piece, List<Piece> searched)
         {
+	        if (!TryGetPiecePos(piece, out var x, out var y)) {
+		        return searched;
+	        }
+	        
+	        searched.Add(piece);
+	        
 	        for (int i = 0; i < Width; i++)
 	        {
-		        var piece = GetAt(i, y);
-		        if (pieces.Contains(piece))
+		        var horizontalPiece = GetAt(i, y);
+		        if (searched.Contains(horizontalPiece))
 		        {
 			        continue;
 		        }
-		        
-		        pieces.Add(piece);
 
-		        if (piece.isVerticalPowerPiece)
+		        if (horizontalPiece.isVerticalPowerPiece)
 		        {
-			        GetAllVertical(i, pieces);
+			        SearchForVertical(horizontalPiece, searched);
+		        }
+		        else
+		        {
+			        searched.Add(horizontalPiece);
 		        }
 	        }
 
-	        return pieces;
+	        return searched;
         }
         
         public Piece[] GetNeighbors(int x, int y) {
@@ -236,19 +269,18 @@ namespace Tactile.TactileMatch3Challenge.Model {
             return neighbors;
         }
         
-        public int FindAndRemoveConnectedAt(int x, int y)
+        public List<Piece> FindAndRemoveConnectedAt(int x, int y)
         {
-			var connections = GetConnected(x, y);
-			if (connections.Count > 1) {
-				RemovePieces(connections);
+	        var connectedPieces = GetConnected(x, y);
+			
+			if (connectedPieces.Count > 1) {
+				RemovePieces(connectedPieces);
 			}
 
-			return connections.Count;
-		}
+			return connectedPieces;
+        }
 
-		public ResolveResult MoveAndCreatePiecesUntilFull() {
-			
-			var result = new ResolveResult();
+		public void MoveAndCreatePiecesUntilFull(ResolveResult result) {
 			
 			int resolveStep = 0;
 			bool moreToResolve = true;
@@ -258,8 +290,6 @@ namespace Tactile.TactileMatch3Challenge.Model {
 				moreToResolve |= CreatePiecesAtTop(result, resolveStep);
 				resolveStep++;
 			}
-
-			return result;
 		}
 
 		private void RemovePieces(List<Piece> connections) {

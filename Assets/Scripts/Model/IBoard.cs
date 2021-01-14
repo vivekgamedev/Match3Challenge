@@ -12,10 +12,10 @@ namespace Tactile.TactileMatch3Challenge.Model {
         
         void MovePiece(int fromX, int fromY, int toX, int toY);
         void RemovePieceAt(int x, int y);
+        void RemoveAllPieces();
         
         List<Piece> GetConnected(int x, int y);
         bool TryGetPiecePos(Piece piece, out int px, out int py);
-
     }
     
 }

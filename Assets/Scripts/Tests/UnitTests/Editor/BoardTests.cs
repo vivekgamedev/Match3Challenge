@@ -171,7 +171,7 @@ namespace Tactile.TactileMatch3Challenge.Tests.UnitTests {
 			
 			// Act
 			board.FindAndRemoveConnectedAt(1, 2);
-			board.MoveAndCreatePiecesUntilFull();
+			board.MoveAndCreatePiecesUntilFull(new ResolveResult());
 
 			// Assert
 			int[,] expected = {
